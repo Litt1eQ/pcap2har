@@ -113,7 +113,7 @@ impl TcpReassembler {
         while let Ok(packet) = cap.next_packet() {
             let timestamp = {
                 let ts = packet.header.ts;
-                DateTime::from_timestamp(ts.tv_sec, (ts.tv_usec * 1000) as u32)
+                DateTime::from_timestamp(ts.tv_sec as i64, (ts.tv_usec * 1000) as u32)
                     .unwrap_or_else(Utc::now)
             };
 
