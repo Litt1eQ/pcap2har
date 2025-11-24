@@ -1,0 +1,33 @@
+[package]
+name = "pcap2har"
+version = "0.1.0"
+edition = "2021"
+authors = ["Litt1eQ"]
+description = "A high-performance PCAP to HAR converter written in Rust with support for HTTP/1.x, HTTP/2, HTTPS (TLS 1.2/1.3), and FastCGI"
+license = "MIT"
+repository = "https://github.com/Litt1eQ/pcap2har"
+homepage = "https://github.com/Litt1eQ/pcap2har"
+documentation = "https://github.com/Litt1eQ/pcap2har#readme"
+readme = "README.md"
+keywords = ["pcap", "har", "http", "network", "packet-analysis"]
+categories = ["command-line-utilities", "network-programming", "development-tools"]
+
+[dependencies]
+pcap = "2.3"
+etherparse = "0.16"
+httparse = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+flate2 = "1.1"
+url = "2.5"
+thiserror = "2.0"
+base64 = "0.22"
+aes-gcm = "0.10"
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+hpack = "0.3"
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }

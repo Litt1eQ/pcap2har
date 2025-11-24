@@ -1,0 +1,154 @@
+name: Build Release Binaries
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ created ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform.target }}
+    runs-on: ${{ matrix.platform.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86_64
+            
+          # macOS Intel
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x86_64
+            
+          # macOS Apple Silicon (M-series chips)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-aarch64
+            
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-target-${{ matrix.platform.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-target-${{ matrix.platform.target }}-
+
+      # Install Linux-specific dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev
+
+      # Install macOS-specific dependencies
+      - name: Install macOS dependencies
+        if: matrix.platform.os == 'macos-latest'
+        run: |
+          brew install libpcap
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.platform.target }}
+
+      - name: Prepare artifacts (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.platform.target }}/release/pcap2har artifacts/pcap2har-${{ matrix.platform.name }}
+          chmod +x artifacts/pcap2har-${{ matrix.platform.name }}
+
+      - name: Prepare artifacts (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        run: |
+          mkdir artifacts
+          copy target\${{ matrix.platform.target }}\release\pcap2har.exe artifacts\pcap2har-${{ matrix.platform.name }}.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcap2har-${{ matrix.platform.name }}
+          path: artifacts/*
+          if-no-files-found: error
+
+  # Optional: Create a merged artifact containing all platform binaries
+  merge-artifacts:
+    name: Merge all artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          
+      - name: Reorganize artifacts
+        run: |
+          mkdir -p merged-artifacts
+          find all-artifacts -type f -exec cp {} merged-artifacts/ \;
+          ls -lh merged-artifacts/
+          
+      - name: Upload merged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcap2har-all-platforms
+          path: merged-artifacts/*
+          if-no-files-found: error
+
+  # Optional: Automatically upload to GitHub Release when a release tag is created
+  release:
+    name: Upload to Release
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
