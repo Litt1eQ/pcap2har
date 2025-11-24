@@ -85,10 +85,16 @@ jobs:
           brew install libpcap
 
       # Install Windows-specific dependencies
-      - name: Install Windows dependencies (Npcap SDK)
+      - name: Install Npcap
         if: matrix.platform.os == 'windows-latest'
         run: |
-          choco install -y npcap --version=1.79
+          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-1.79.exe" -OutFile "npcap-installer.exe"
+          Start-Process -FilePath ".\npcap-installer.exe" -ArgumentList "/S" -Wait
+        shell: powershell
+
+      - name: Install Npcap SDK
+        if: matrix.platform.os == 'windows-latest'
+        run: |
           Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile "npcap-sdk.zip"
           Expand-Archive -Path "npcap-sdk.zip" -DestinationPath "C:\npcap-sdk"
           $lib_path = "C:\npcap-sdk\Lib\x64"
