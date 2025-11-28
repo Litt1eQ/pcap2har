@@ -72,11 +72,40 @@ impl TcpStream {
 
         let mut data = Vec::new();
         let mut timestamps = Vec::new();
+        let mut next_seq: Option<u32> = None;
 
         for segment in sorted_segments {
-            if !segment.data.is_empty() {
-                data.extend_from_slice(&segment.data);
-                timestamps.push(segment.timestamp);
+            if segment.data.is_empty() {
+                continue;
+            }
+
+            let seg_end = segment.seq.wrapping_add(segment.data.len() as u32);
+
+            match next_seq {
+                None => {
+                    data.extend_from_slice(&segment.data);
+                    timestamps.push(segment.timestamp);
+                    next_seq = Some(seg_end);
+                }
+                Some(expected) => {
+                    if segment.seq == expected {
+                        data.extend_from_slice(&segment.data);
+                        timestamps.push(segment.timestamp);
+                        next_seq = Some(seg_end);
+                    } else if segment.seq > expected {
+                        data.extend_from_slice(&segment.data);
+                        timestamps.push(segment.timestamp);
+                        next_seq = Some(seg_end);
+                    } else if seg_end > expected {
+                        let overlap = (expected - segment.seq) as usize;
+                        if overlap < segment.data.len() {
+                            data.extend_from_slice(&segment.data[overlap..]);
+                            timestamps.push(segment.timestamp);
+                            next_seq = Some(seg_end);
+                        }
+                    }
+                    // completely retransmitted segment, skip it
+                }
             }
         }
 

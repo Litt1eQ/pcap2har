@@ -126,7 +126,6 @@ impl Converter {
 
         let mut decrypted_streams: HashMap<StreamKey, (Vec<u8>, Vec<chrono::DateTime<chrono::Utc>>)> =
             HashMap::new();
-
         for (key, (data, timestamps)) in &tls_streams {
             let reverse = key.reverse();
             let client_random = client_randoms.get(key).or_else(|| client_randoms.get(&reverse));
@@ -296,6 +295,10 @@ impl Converter {
     fn decrypt_tls13_stream(&self, data: &[u8], secret: &[u8]) -> Option<Vec<u8>> {
         let records = parse_tls_records(data);
         let app_records: Vec<_> = records.iter().filter(|r| r.content_type == 23).collect();
+        
+        if app_records.is_empty() {
+            return None;
+        }
 
         // Try different skip values - first records may use handshake keys
         for skip in 0..app_records.len().min(6) {
